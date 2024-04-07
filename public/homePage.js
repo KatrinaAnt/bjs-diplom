@@ -1,4 +1,8 @@
 const logout = new LogoutButton();
+const ratesBoard = new RatesBoard();
+const moneyManager = new MoneyManager();
+const favoritesWidget = new FavoritesWidget();
+
 logout.action = function() {
 	ApiConnector.logout((response) => {
 		if (response.success) {
@@ -10,22 +14,24 @@ logout.action = function() {
 ApiConnector.current(response => {
 	if (response.success) {
 		ProfileWidget.showProfile(response.data);
+	} else {
+		moneyManager.setMessage(response.isSuccess, "Что-то пошло не так. Не удалось получить данные пользователя");
 	}
 });
 
-const ratesBoard = new RatesBoard();
 const stocks = function() {
 	ApiConnector.getStocks(response => {
 		if (response.success) {
 			ratesBoard.clearTable();
 			ratesBoard.fillTable(response.data);
+		} else {
+			moneyManager.setMessage(response.isSuccess, "Что-то пошло не так. Не удалось получить данные курсов валют");
 		}
 	})
 };
 stocks();
-setInterval(() => stocks(), 60000);
+setInterval(stocks, 60000);
 
-const moneyManager = new MoneyManager();
 moneyManager.addMoneyCallback = function({ currency, amount }) {
 	ApiConnector.addMoney({ currency, amount }, (response) => {
 		if (response.success) {
@@ -59,21 +65,24 @@ moneyManager.sendMoneyCallback = function({ to, currency, amount }) {
 	})
 }
 
-const favoritesWidget = new FavoritesWidget();
+function update(response) {
+	favoritesWidget.clearTable();
+	favoritesWidget.fillTable(response.data);
+	moneyManager.updateUsersList(response.data);
+}
+
 ApiConnector.getFavorites(response => {
 	if (response.success) {
-		favoritesWidget.clearTable();
-		favoritesWidget.fillTable(response.data);
-		moneyManager.updateUsersList(response.data);
+		update(response);
+	}else {
+		favoritesWidget.setMessage(response.isSuccess, "Что-то пошло не так. Не удалось получить данные списка избранных");
 	}
 });
 favoritesWidget.addUserCallback = function({ id, name }) {
 	debugger;
 	ApiConnector.addUserToFavorites({ id, name }, (response) => {
 		if (response.success) {
-			this.clearTable();
-			this.fillTable(response.data);
-			moneyManager.updateUsersList(response.data);
+			update(response);
 			this.setMessage(response.isSuccess, "Пользователь добавлен в список избранных");
 		} else {
 			this.setMessage(response.isSuccess, "Произошла ошибка. Проверьте правильность ввода данных");
@@ -83,9 +92,7 @@ favoritesWidget.addUserCallback = function({ id, name }) {
 favoritesWidget.removeUserCallback = function(id) {
 	ApiConnector.removeUserFromFavorites(id, (response) => {
 		if (response.success) {
-			this.clearTable();
-			this.fillTable(response.data);
-			moneyManager.updateUsersList(response.data);
+			update(response);
 			this.setMessage(response.isSuccess, "Пользователь удалён из списка избранных");
 		} else {
 			this.setMessage(response.isSuccess, "Произошла ошибка. Не удалось удалить пользователя");
